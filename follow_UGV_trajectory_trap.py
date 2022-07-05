@@ -8,7 +8,7 @@ from fiducial_msgs.msg import FiducialTransformArray, FiducialTransform
 from mavros_msgs.msg import State
 from geometry_msgs.msg import Pose, Twist, Vector3, Transform, Point, Quaternion, PoseStamped
 from nav_msgs.msg import Odometry
-from std_msgs.msg import Float64MultiArray, MultiArrayDimension
+from std_msgs.msg import Float64MultiArray, MultiArrayDimension, Int8
 
 # Libraries for the transformations between frames
 import tf

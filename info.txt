@@ -7,7 +7,7 @@ roslaunch transforms.launch
 
 T2
 
-rosbag record /tf /tf_static /fiducial_images/compressed /fiducial_transforms /mavros/imu/data /mavros/setpoint_velocity/cmd_vel_unstamped /mavros/state /estimation/xyzy /observations/rpy /observations/xyz
+rosbag record /tf /tf_static /fiducial_images/compressed /fiducial_transforms /mavros/imu/data /mavros/setpoint_velocity/cmd_vel_unstamped /mavros/state /estimation/xyzy /observations/rpy /observations/xyz /uav_setpoint /uav_mode
 
 T3
 
