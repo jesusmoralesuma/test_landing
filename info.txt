@@ -1,0 +1,18 @@
+Remote terminals with ssh Hexacopter
+
+T1
+
+sudo chmod 666 /dev/ttyTHS0
+roslaunch transforms.launch
+
+T2
+
+rosbag record /tf /tf_static /fiducial_images/compressed /fiducial_transforms /mavros/imu/data /mavros/setpoint_velocity/cmd_vel_unstamped /mavros/state /estimation/xyzy /observations/rpy /observations/xyz
+
+T3
+
+python follow_UGV_trajectory_trap.py
+
+Local terminal
+
+roslaunch hexa_teleop teleop_hexa.launch

@@ -1,0 +1,47 @@
+<?xml version="1.0"?>
+
+<launch>
+      <arg name="color_width"         value="848"/>
+      <arg name="color_height"        value="480"/>
+      <arg name="color_fps"           value="30"/>
+      <arg name="enable_depth"        value="false"/>
+
+
+    <include file="$(find mavros)/launch/apm.launch">
+      <arg name="fcu_url" default="/dev/ttyTHS0:921600" />
+    </include>
+
+    <include file="$(find realsense2_camera)/launch/rs_camera.launch">
+      <arg name="color_width"         value="$(arg color_width)"/>
+      <arg name="color_height"        value="$(arg color_height)"/>
+      <arg name="color_fps"           value="$(arg color_fps)"/>
+      <arg name="enable_depth"        value="$(arg enable_depth)"/>
+    </include>
+
+    <include file="$(find aruco_detect)/launch/aruco_detect3.launch"> </include>
+
+    <include file="$(find hector_imu_attitude_to_tf)/launch/example.launch"> </include>
+
+    <node pkg="rosservice" type="rosservice" name="mavros_stream" args="call --wait /mavros/set_stream_rate 0 15 1" /> 
+
+   <group> 
+       <node pkg="image_transport" type="republish" name="rgb_compress" args="raw in:=/camera/color/image_raw compressed out:=/camera/color/image_raw"/>
+
+    </group> 
+
+    <group>
+       <node pkg="tf" type="static_transform_publisher" name="marker946_broadcaster" args="0 -0.10345 0 0 0 0 fiducial_946 fiducial_T_946 10"/>
+
+       <node pkg="tf" type="static_transform_publisher" name="marker227_broadcaster" args="0.0735 0.1053 0 0 0 0 fiducial_227 fiducial_T_227 10"/>
+
+       <node pkg="tf" type="static_transform_publisher" name="marker168_broadcaster" args="-0.0738 0.1367 0 0 0 0 fiducial_168 fiducial_T_168 10"/>
+
+       <node pkg="tf" type="static_transform_publisher" name="marker55_broadcaster" args="-0.06175 0.06175 0 0 0 0 fiducial_55 fiducial_T_55 10"/>
+
+   <!--QUAD    <node pkg="tf" type="static_transform_publisher" name="cam_broadcaster" args="0.07 0 0 -3.14 1.57 0 base_link camera_link 10"/> -->
+	<node pkg="tf" type="static_transform_publisher" name="cam_broadcaster" args="0 0 0 1.57 1.57 0 base_link camera_link 10"/>
+
+   </group> 
+
+
+</launch>
