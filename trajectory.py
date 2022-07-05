@@ -18,8 +18,8 @@ class Trapezoidal(object):
         self._tau = np.zeros_like(dq_max)
     def get_end_time(self):
         """ Return end time of the profile """
-        return self._t1+self._tau
-        
+        return self._t1[0]+self._tau[0]
+
     def set_positions(self, q_init, q_final):
         """
         Updates current and desired positions
@@ -59,7 +59,7 @@ class Trapezoidal(object):
         q[3] = (q[3] + np.pi) % (2.0 * np.pi) - np.pi
         return q
 
-    def compute_profile(self, q_init, q_final):
+    def compute_profile(self, q_init, q_final=[]):
         """
         Generates trapezoidal profile
         Args:
@@ -74,50 +74,57 @@ class Trapezoidal(object):
                 /  |        |  \
                   t_1       tau
         """        
-        self.set_positions(q_init, self.rotate_inv(q_final, q_final[3]))
+        if q_final==[]:
+            self.set_positions(q_init, q_init)
+            self._t1 = np.zeros_like(self._t1)
+            self._tau = np.zeros_like(self._tau)
+            self._dq_max_current = np.zeros_like(self._dq_max_current)
+            self._ddq_max_current = np.zeros_like(self._ddq_max_current)
+        else:
+            self.set_positions(q_init, self.rotate_inv(q_final, q_final[3]))
 
-        if self.cartesian:            
-            delta_q_sign = self.wrap(self.rotate_inv(self._q_final,self._q_final[3]-self._q_init[3]) - self._q_init)          
-        else:        
-            delta_q_sign = self.wrap(self._q_final - self._q_init)      
-        delta_q = np.abs(delta_q_sign)                
+            if self.cartesian:            
+                delta_q_sign = self.wrap(self.rotate_inv(self._q_final,self._q_final[3]-self._q_init[3]) - self._q_init)          
+            else:        
+                delta_q_sign = self.wrap(self._q_final - self._q_init)      
+            delta_q = np.abs(delta_q_sign)                
 
-        dq_max_prime = np.sqrt(delta_q * self._ddq_max)
-        for idx, value in np.ndenumerate(dq_max_prime < self._dq_max):
-            i=idx[0]
-            # print(i,value)
-            # Triangular profile
-            if value:
-                self._t1[i] = dq_max_prime[i] / self._ddq_max[i]
-                self._tau[i] = self._t1[i]
-                self._dq_max_current[i] = dq_max_prime[i]*np.sign(delta_q_sign[i])
-            # Trapezoidal profile
-            else:
-                self._t1[i] = self._dq_max[i] / self._ddq_max[i]
-                self._tau[i] = delta_q[i] / self._dq_max[i]
-                self._dq_max_current[i] = self._dq_max[i]*np.sign(delta_q_sign[i])
+            dq_max_prime = np.sqrt(delta_q * self._ddq_max)
+            for idx, value in np.ndenumerate(dq_max_prime < self._dq_max):
+                i=idx[0]
+                # print(i,value)
+                # Triangular profile
+                if value:
+                    self._t1[i] = dq_max_prime[i] / self._ddq_max[i]
+                    self._tau[i] = self._t1[i]
+                    self._dq_max_current[i] = dq_max_prime[i]*np.sign(delta_q_sign[i])
+                # Trapezoidal profile
+                else:
+                    self._t1[i] = self._dq_max[i] / self._ddq_max[i]
+                    self._tau[i] = delta_q[i] / self._dq_max[i]
+                    self._dq_max_current[i] = self._dq_max[i]*np.sign(delta_q_sign[i])
 
-        t1_max = np.max(self._t1)
-        tau_max = np.max(self._tau)
+            t1_max = np.max(self._t1)
+            tau_max = np.max(self._tau)
 
-        # Equalize profiles
-        dq_max_new = delta_q/tau_max
-        ddq_max_new = delta_q/(tau_max*t1_max)
+            # Equalize profiles
+            dq_max_new = delta_q/tau_max
+            ddq_max_new = delta_q/(tau_max*t1_max)
 
-        self._t1 = np.ones_like(self._t1)*t1_max
-        self._tau = np.ones_like(self._tau)*tau_max
+            self._t1 = np.ones_like(self._t1)*t1_max
+            self._tau = np.ones_like(self._tau)*tau_max
 
-        dq_max_prime = np.sqrt(delta_q * ddq_max_new)        
-        for idx, value in np.ndenumerate(dq_max_prime < dq_max_new):
-            i=idx[0]
-            # Triangular profile
-            if value:
-                self._dq_max_current[i] = dq_max_prime[i]*np.sign(delta_q_sign[i])
-            # Trapezoidal profile
-            else:
-                self._dq_max_current[i] = dq_max_new[i]*np.sign(delta_q_sign[i])
+            dq_max_prime = np.sqrt(delta_q * ddq_max_new)        
+            for idx, value in np.ndenumerate(dq_max_prime < dq_max_new):
+                i=idx[0]
+                # Triangular profile
+                if value:
+                    self._dq_max_current[i] = dq_max_prime[i]*np.sign(delta_q_sign[i])
+                # Trapezoidal profile
+                else:
+                    self._dq_max_current[i] = dq_max_new[i]*np.sign(delta_q_sign[i])
 
-        self._ddq_max_current = delta_q_sign/(tau_max*t1_max)
+            self._ddq_max_current = delta_q_sign/(tau_max*t1_max)
 
         # # Consider controller frequency
         # if self._control_freq != 0:
@@ -127,7 +134,7 @@ class Trapezoidal(object):
         #     t_1 = n / self._control_freq
         #     tau = m / self._control_freq
 
-        print(self._t1,self._tau)
+        print('t1 and tau',self._t1,self._tau)
 
         # return t_1, tau
 

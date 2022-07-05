@@ -7,17 +7,66 @@ from std_msgs.msg import Float32
 from numpy.polynomial import Polynomial
 
 def rotate_inv(q):
-    return np.vstack((
-        q[:,0]*np.cos(q[:,3]-q[0,3])-q[:,1]*np.sin(q[:,3]-q[0,3]),
-        q[:,0]*np.sin(q[:,3]-q[0,3])+q[:,1]*np.cos(q[:,3]-q[0,3]),
-        q[:,2],
-        q[:,3]
-    )).T
+    if len(q.shape) == 2:
+        return np.vstack((
+            q[:,0]*np.cos(q[:,3]-q[0,3])-q[:,1]*np.sin(q[:,3]-q[0,3]),
+            q[:,0]*np.sin(q[:,3]-q[0,3])+q[:,1]*np.cos(q[:,3]-q[0,3]),
+            q[:,2],
+            q[:,3]
+        )).T
+    else:
+        return np.array([
+            q[0]*np.cos(-q[3])-q[1]*np.sin(-q[3]),
+            q[0]*np.sin(-q[3])+q[1]*np.cos(-q[3]),
+            q[2],
+            q[3]
+            ])   
 
 bagdir = './bags/'
-# bagfile = '2022-06-30-09-49-49.bag'
-bagfile = '2022-06-30-09-53-53.bag'
+# bagdir = './Simulation/bags/'
+# bagfile = '2022-06-22-16-07-11.bag' # trapezoidal profile + proportional control
+# bagfile = '2022-06-23-10-11-12.bag' # trapezoidal profile only
+# bagfile = '2022-06-23-10-17-35.bag'  # trapezoidal profile only
+# bagfile = '2022-06-23-10-25-32.bag' #  trapezoidal profile only with xyz yaw estimation
+# bagfile = '2022-06-23-10-57-55.bag' #  trapezoidal profile only with xyz yaw estimation and inital position averaged
+# bagfile = '2022-06-23-11-14-54.bag'
+# bagfile = '2022-06-23-11-19-11.bag'
+# bagfile = '2022-06-23-11-23-46.bag'
+# bagfile = '2022-06-23-11-35-20.bag'
+# bagfile = '2022-06-23-11-44-15.bag'
+# bagfile = '2022-06-23-13-49-13.bag'
+# bagfile = '2022-06-23-14-02-19.bag'
+# bagfile = '2022-06-23-14-12-31.bag'
+# bagfile = '2022-06-23-14-51-22.bag'
+# bagfile = '2022-06-23-15-02-35.bag'
+# bagfile = '2022-06-23-15-23-05.bag'
+# bagfile = '2022-06-24-12-55-34.bag'
+# bagfile = '2022-06-24-15-38-01.bag'
+# bagfile = '2022-06-27-15-10-37.bag'
+# bagfile = '2022-06-27-15-26-57.bag'
+# bagfile = '2022-06-27-15-31-33.bag'
+# bagfile = '2022-06-27-15-36-22.bag'
+# bagfile = '2022-06-27-16-00-17.bag'
+# bagfile = '2022-06-28-10-47-03.bag'
+# bagfile = '2022-06-28-10-51-32.bag'
 
+# bagfile = '2022-06-28-12-14-42.bag'
+# bagfile = '2022-06-28-12-19-43.bag'
+# bagfile = '2022-06-28-12-27-07.bag'
+# bagfile = '2022-06-28-12-32-08.bag'
+# bagfile = '2022-06-28-12-43-10.bag' # Smaller gains
+# bagfile = '2022-06-28-12-55-48.bag'
+# bagfile = '2022-06-28-12-59-14.bag'
+# bagfile = '2022-06-28-13-01-34.bag'
+# bagfile = '2022-06-28-14-21-43.bag'
+# bagfile = '2022-06-28-14-42-10.bag'
+# bagfile = '2022-06-28-14-47-38.bag'
+# bagfile = '2022-06-28-14-55-12.bag'
+# bagfile = '2022-06-28-14-58-00.bag'
+# bagfile = '2022-06-28-15-09-48.bag'
+# bagfile = '2022-06-28-16-34-38.bag'
+# bagfile = '2022-07-01-15-43-27.bag'
+bagfile = '2022-07-04-12-30-48.bag'
 bag = rosbag.Bag(bagdir+bagfile)
 
 topic0 = '/mavros/setpoint_velocity/cmd_vel_unstamped'
@@ -49,7 +98,6 @@ for i, (topic, msg, time) in enumerate(bag.read_messages(topics=topic3)):
     state[i] = modes[msg.mode]
     t_state[i] = time.to_time()
 
-
 for i, (topic, msg, time) in enumerate(bag.read_messages(topics=topic0)):
     cmd_vel[i,:] = np.array([msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z ])
     t[i] = time.to_time()
@@ -77,11 +125,16 @@ idx=area>0
 p_fitted = Polynomial.fit(z[idx],area[idx],deg=2)
 z_int, area_int = p_fitted.linspace()
 
+az_fitted = Polynomial.fit(area[idx],area[idx]*z[idx],deg=1)
+a_int2, az_int2 = az_fitted.linspace()
+
+
 mp.figure()
 mp.subplot(221)
 # mp.plot(z[idx], np.sqrt(area[idx]),'.')
 mp.plot(z[idx], area[idx],'.')
 # mp.plot(z_int, np.sqrt(area_int),'.')
+mp.plot(az_int2/a_int2, az_int2,'.')
 mp.grid('on')
 mp.xlabel('z')
 mp.ylabel('area')
@@ -101,8 +154,8 @@ mp.grid('on')
 mp.xlabel('x')
 mp.ylabel('y')
 mp.axis('equal')
-mp.show()
 
+mp.figure()
 t_max = np.max([t_state[-1]-t_state[0], t[-1]-t_state[0], t_x[-1]-t_x[0]])
 mp.subplot(211)
 mp.plot(t-t_state[0],cmd_vel,'.-')
@@ -112,6 +165,20 @@ mp.grid(True)
 mp.subplot(212)
 mp.plot(t_x-t_state[0],xyzy,'.-',t_x-t_state[0],np.ones_like(xyzy)*np.pi,t_x-t_state[0],-np.ones_like(xyzy)*np.pi)
 mp.plot(t_state-t_state[0], state)
+mp.legend(('x','y','z','yaw'))    
+mp.axis([0,t_max,-4, 5])    
+mp.grid(True)
+mp.show()
+
+mp.figure()
+t_max = np.max([t[-1]-t[0], t_x[-1]-t_x[0]])
+mp.subplot(211)
+mp.plot(t-t[0],cmd_vel,'.-')
+mp.legend(('v_x','v_y','v_z','\omega_z'))
+mp.axis([0,t_max,-1, 1])    
+mp.grid(True)
+mp.subplot(212)
+mp.plot(t_x-t_x[0],xyzy,'.-',t_x-t_x[0],np.ones_like(xyzy)*np.pi,t_x-t_x[0],-np.ones_like(xyzy)*np.pi)
 mp.legend(('x','y','z','yaw'))    
 mp.axis([0,t_max,-4, 5])    
 mp.grid(True)

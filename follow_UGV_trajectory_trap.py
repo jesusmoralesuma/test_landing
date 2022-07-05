@@ -32,6 +32,8 @@ class Publisher(object):
         ## Subscribers ##
         self.sub_marker = rospy.Subscriber("/fiducial_transforms", FiducialTransformArray, self.callback_marker)
         self.sub_State = rospy.Subscriber("/mavros/state", State, self.check_Remote_mode)
+        self.sub_setpoint = rospy.Subscriber("/uav_setpoint", Twist, self.callback_uav_setpoint)
+        self.sub_uav_mode = rospy.Subscriber("/uav_mode", Int8, self.callback_uav_mode)
 
         #self.sub_odom = rospy.Subscriber("/mavros/local_position/pose", PoseStamped, self.callback_odom)
         ## Publishers ##
@@ -96,6 +98,9 @@ class Publisher(object):
         self.tp = Trapezoidal(dq_max, ddq_max, True) # Perform trajectory planning in fixed frame
         # Controller
         self.Kp = np.array([0.35, 0.35, 0.35, 0.25]) # Proportional gain
+        self.Ki = np.array([0.1, 0.1, 0.1, 0.1]) # Integral gain
+        self.error = np.zeros_like(self.Kp) # Error
+        self.ierror = np.zeros_like(self.Ki) # Integral error
         # self.pose_sp = np.array([-0.8, -0.8, 3.5,np.pi/2.])
         # self.pose_sp = np.array([0.,0.,1.,np.pi/2])
         # self.pose_sp = np.array([0.,0.,1.,0.]) # Set point in body frame
@@ -106,38 +111,62 @@ class Publisher(object):
         # self.pose_sp = np.array([0.0, 1.0, 3.8, 0.*np.pi/4.0]) # Set point in body frame
         self.pose_sp = np.array([0.0, 0.0, 1.0, 0.*np.pi/4.0]) # Set point in body frame
         # self.pose_sp = np.array([-1.0, -1.0, 3.7, 0.0]) # Set point in body frame
-        self.initialized = False # True when initial estimation for XYZ_YAW is obtained       
+        self.pose = np.zeros_like(self.pose_sp) # UAV pose provided by the aruco marks
+        self.mode = 0 # 1: autonomous mode, 0: teleoperated mode
+        self.prev_mode = 1
+        self.reset_state()       
         self.reset_time()
         self.reset_wdt()
 
     def reset_time(self):
-        self.time = -0.1
+        self.time = 0.0
     
     def reset_wdt(self):
         self.wdt = 0.5 # watchdog timer for observations
+
+    def reset_error(self, cmd=[]):
+        self.error = np.zeros_like(self.Kp) # Integral error
+        if cmd==[]:            
+            self.ierror = np.zeros_like(self.Ki) # Integral error
+        else:
+            for i, Ki in enumerate(self.Ki):
+                if Ki > 0.:
+                    self.ierror[i] = cmd[i]/Ki
+                else:
+                    self.ierror[i] = 0.
+        print('reset error', self.error)
+        print('reset ierror', self.ierror)
+
+    def reset_state(self):
+        self.initialized = False # True when initial estimation for XYZ_YAW is obtained
+        self.landing = False # True if the landing sequence is initiated        
 
     def start(self):
 
         while( not self.check_landing() and not rospy.is_shutdown()):
 
-            if(self.firstObs == True and self.current_state.mode == "GUIDED"):
-
+            if(self.firstObs == True and self.current_state.mode == "GUIDED" and self.mode==1):
                 if (self.prev_state.mode != self.current_state.mode): 
                     print("Mode is: ", self.current_state.mode)
                     self.prev_state = self.current_state
-                if(self.hasObs and self.hasObsRPY and self.current_state.mode == "GUIDED"):
+                if(self.hasObs and self.hasObsRPY and self.current_state.mode == "GUIDED" and self.mode==1):
                     self.reset_wdt()                    
-                    self.initialized = True
-                    XYZW = np.array([-self.obs[0], -self.obs[1], -self.obs[2], -self.obsRPY[2]])                                      
+                    self.pose = np.array([-self.obs[0], -self.obs[1], -self.obs[2], -self.obsRPY[2]])                                      
                     if self.time >= 0. and self.time < self.T: # Compute position-speed profile and first sample
-                        # self.pose_sp[3]=XYZW[3]+np.pi/2. # 90 degree rotation test
-                        self.tp.compute_profile(XYZW,  self.pose_sp)
+                        if self.initialized:
+                            self.tp.compute_profile(self.pose, self.pose_sp)
+                            print('Setpoint navigation')
+                        else:
+                            # self.tp.compute_profile(self.pose,  self.tp.rotate(self.pose, self.pose[3]))
+                            self.tp.compute_profile(self.pose)
+                            print('Aruco Locked')
                         q, dq = self.tp.generate_q_dq(self.time)
                         self.cmd = dq
                     elif self.time > 0.: # Compute next samples
                         q, dq = self.tp.generate_q_dq(self.time)
-                        self.cmd = dq + self.Kp*(self.tp.wrap(q-XYZW))
-                        print(self.tp.wrap(q-XYZW)) # Print error
+                        self.error = self.tp.wrap(q-self.pose)
+                        self.ierror += self.error*(self.time-self.prev_time)
+                        self.cmd = dq + self.Kp*self.error + self.Ki*self.ierror
                     self.vel_xyz_yaw(self.cmd)
                     self.prev_time = self.time
                 else: # If no observation received -> decrease watchdog timer and if negative stop the drone and reset time
@@ -146,9 +175,9 @@ class Publisher(object):
                         self.cmd = np.zeros((4,))
                         self.vel_xyz_yaw(self.cmd)
                         self.reset_time()
-                        self.initialized = False
-                if self.initialized:
-                    self.time+=self.T
+                        self.reset_error()
+                        self.reset_state()
+                self.time+=self.T
                 # print(self.time)
 
             if (self.prev_state.mode != self.current_state.mode):
@@ -158,7 +187,8 @@ class Publisher(object):
                 self.cmd = np.zeros((4,))
                 self.reset_time()
                 self.reset_wdt()
-                self.initialized = False               
+                self.reset_error()
+                self.reset_state()          
 
             self.rate.sleep()
         
@@ -178,7 +208,32 @@ class Publisher(object):
         #check to see if remote is in guided mode
         self.current_state=state
 
-            
+    def callback_uav_mode(self, msg):        
+        if msg.data==1:
+            self.mode=1
+        elif msg.data==0:
+            self.mode=0
+        if self.prev_mode != self.mode:
+            self.prev_mode = self.mode
+            self.reset_time()
+            self.reset_wdt()
+            self.reset_error()
+            self.reset_state()
+            print('mode',self.mode,' reset t w e s')
+
+    def callback_uav_setpoint(self, msg):
+        ''' Receive uav setpoint wrt aruco reference frame
+        TODO check set_point values to be in the FOV of the camera
+        '''
+        self.pose_sp = np.array([msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z])
+        print('setpoint',self.pose_sp)
+        print('cmd',self.cmd)
+        self.reset_time()
+        self.reset_error(self.cmd)
+        self.reset_wdt()
+        self.reset_state()
+        self.initialized = True
+        
     """
     > Markers Callback
     """
