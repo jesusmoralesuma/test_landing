@@ -37,11 +37,12 @@ for i, time in np.ndenumerate(t):
 # mp.show()
 
 tp_cart=trajectory.Trapezoidal(dq_max, ddq_max, True)
-tp_cart.compute_profile(q_init, q_final)
+# tp_cart.compute_profile(q_init, q_final)
+tp_cart.compute_profile(q_init)
 
 t_cart = np.arange(0,tp_cart._tau[0]+tp_cart._t1[0]*2.,0.1)
-q_cart = np.zeros((len(t),len(q_init)))
-dq_cart = np.zeros((len(t),len(q_init)))
+q_cart = np.zeros((len(t_cart),len(q_init)))
+dq_cart = np.zeros((len(t_cart),len(q_init)))
 
 for i, time in np.ndenumerate(t):
     q_cart[i,:], dq_cart[i,:] = tp_cart.generate_q_dq(time)

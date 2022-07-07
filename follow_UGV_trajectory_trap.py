@@ -48,7 +48,7 @@ class Publisher(object):
         self.obs = np.array([0,0,0])
         self.obsp = np.array([0,0,0])
         self.obsRPY = np.array([0,0,0])
-        self.mean_quat_prev = np.array([0,0,0,0])
+        self.obsRPYp = np.array([0,0,0])
         self.hasObs = False
         self.firstObs = False
         self.hasObsRPY = False
@@ -108,18 +108,19 @@ class Publisher(object):
         # self.pose_sp = np.array([0.2, 0.5, 1., 0.]) # Set point in body frame
         # self.pose_sp = np.array([0.2, 0.5, 3.7, np.pi]) # Set point in body frame
         # self.pose_sp = np.array([1.0, 1.0, 3.7, np.pi/2.]) # Set point in body frame
-        # self.pose_sp = np.array([0.0, 1.0, 3.8, 0.*np.pi/4.0]) # Set point in body frame
-        self.pose_sp = np.array([0.0, 0.0, 1.0, 0.*np.pi/4.0]) # Set point in body frame
+        self.pose_sp = np.array([0., 0., 3, 0.*np.pi/4.0]) # Set point wrt to the aruco frame. Position (X,Y,Z) and orientation (YAW)
         # self.pose_sp = np.array([-1.0, -1.0, 3.7, 0.0]) # Set point in body frame
         self.pose = np.zeros_like(self.pose_sp) # UAV pose provided by the aruco marks
         self.mode = 0 # 1: autonomous mode, 0: teleoperated mode
         self.prev_mode = 1
+        self.pending_sp = False 
         self.reset_state()       
         self.reset_time()
         self.reset_wdt()
 
     def reset_time(self):
         self.time = 0.0
+        self.prev_time = 0.0
     
     def reset_wdt(self):
         self.wdt = 0.5 # watchdog timer for observations
@@ -134,41 +135,49 @@ class Publisher(object):
                     self.ierror[i] = cmd[i]/Ki
                 else:
                     self.ierror[i] = 0.
-        print('reset error', self.error)
-        print('reset ierror', self.ierror)
-
+        # print('reset error', self.error)
+        # print('reset ierror', self.ierror)
+    
     def reset_state(self):
         self.initialized = False # True when initial estimation for XYZ_YAW is obtained
-        self.landing = False # True if the landing sequence is initiated        
+        self.pending_sp = False # Reset setpoint status
+        self.mode = 0 # Reset mode to teleoperation
+        self.prev_mode = 1 # Reset previous mode to autonomous
+        print('UAV state reset')
 
     def start(self):
 
         while( not self.check_landing() and not rospy.is_shutdown()):
 
             if(self.firstObs == True and self.current_state.mode == "GUIDED" and self.mode==1):
-                if (self.prev_state.mode != self.current_state.mode): 
-                    print("Mode is: ", self.current_state.mode)
-                    self.prev_state = self.current_state
-                if(self.hasObs and self.hasObsRPY and self.current_state.mode == "GUIDED" and self.mode==1):
+                if (self.hasObs and self.hasObsRPY):
                     self.reset_wdt()                    
                     self.pose = np.array([-self.obs[0], -self.obs[1], -self.obs[2], -self.obsRPY[2]])                                      
-                    if self.time >= 0. and self.time < self.T: # Compute position-speed profile and first sample
+                    if self.pending_sp:
+                        self.tp.compute_profile(self.pose, self.pose_sp)                                                    
+                        self.reset_time()
                         if self.initialized:
-                            self.tp.compute_profile(self.pose, self.pose_sp)
-                            print('Setpoint navigation')
+                            self.reset_error(self.cmd)
                         else:
-                            # self.tp.compute_profile(self.pose,  self.tp.rotate(self.pose, self.pose[3]))
-                            self.tp.compute_profile(self.pose)
-                            print('Aruco Locked')
-                        q, dq = self.tp.generate_q_dq(self.time)
-                        self.cmd = dq
-                    elif self.time > 0.: # Compute next samples
-                        q, dq = self.tp.generate_q_dq(self.time)
-                        self.error = self.tp.wrap(q-self.pose)
-                        self.ierror += self.error*(self.time-self.prev_time)
-                        self.cmd = dq + self.Kp*self.error + self.Ki*self.ierror
+                            self.reset_error()
+                        self.reset_wdt()
+                        self.initialized = True
+                        self.pending_sp = False                        
+                        print('Setpoint navigation')
+                    elif not self.initialized:
+                        self.tp.compute_profile(self.pose)
+                        self.reset_time()
+                        self.reset_error()
+                        self.reset_wdt()
+                        self.initialized = True                      
+                        print('Aruco Locked')
+                    q, dq = self.tp.generate_q_dq(self.time)
+                    self.error = self.tp.wrap(q-self.pose)
+                    self.ierror += self.error*(self.time-self.prev_time)
+                    self.cmd = dq + self.Kp*self.error + self.Ki*self.ierror
+                    # print(q, dq, self.error, self.ierror,self.time-self.prev_time)
                     self.vel_xyz_yaw(self.cmd)
-                    self.prev_time = self.time
+                    self.prev_time = self.time                
                 else: # If no observation received -> decrease watchdog timer and if negative stop the drone and reset time
                     self.wdt-=self.T
                     if self.wdt<0.:
@@ -177,18 +186,21 @@ class Publisher(object):
                         self.reset_time()
                         self.reset_error()
                         self.reset_state()
-                self.time+=self.T
-                # print(self.time)
+                        print('wdt')
+                if self.initialized:
+                    self.time+=self.T
+                print(self.time)
 
             if (self.prev_state.mode != self.current_state.mode):
                 # if flight mode changed, re initialize PID params
-                print("Mode is: ", self.current_state.mode)
+                print("RC Mode is: ", self.current_state.mode)
                 self.prev_state = self.current_state
                 self.cmd = np.zeros((4,))
+                self.vel_xyz_yaw(self.cmd)
                 self.reset_time()
                 self.reset_wdt()
                 self.reset_error()
-                self.reset_state()          
+                self.reset_state()
 
             self.rate.sleep()
         
@@ -227,13 +239,9 @@ class Publisher(object):
         '''
         self.pose_sp = np.array([msg.linear.x, msg.linear.y, msg.linear.z, msg.angular.z])
         print('setpoint',self.pose_sp)
-        print('cmd',self.cmd)
-        self.reset_time()
-        self.reset_error(self.cmd)
-        self.reset_wdt()
-        self.reset_state()
-        self.initialized = True
-        
+        print('current cmd',self.cmd)
+        self.pending_sp = True
+            
     """
     > Markers Callback
     """
@@ -321,8 +329,8 @@ class Publisher(object):
                     mean_quat = self.mean_quat_prev
                     print('Complex, using previous value')
             self.RPY[4,:]=np.array(euler_from_quaternion(mean_quat))*180.0/np.pi # Store mean value
-            self.mean_quat_prev = mean_quat.copy()
-            self.obsRPY = euler_from_quaternion(mean_quat)            
+            self.mean_quat_prev = mean_quat.copy()            
+            self.obsRPY = euler_from_quaternion(mean_quat)
             self.msgRPY.data = self.RPY.reshape([15])
             self.pub_obs_rpy.publish(self.msgRPY)  
 
@@ -334,13 +342,24 @@ class Publisher(object):
             
     def vel_xyz_yaw(self,target_angles):
         msg_iris = Twist()
-        msg_iris.linear.x = target_angles[0]
-        msg_iris.linear.y = target_angles[1]
-        msg_iris.linear.z = target_angles[2]
-        msg_iris.angular.z = target_angles[3]
+        if np.abs(target_angles[0])>1.0:
+            msg_iris.linear.x = 1.0*np.sign(target_angles[0])
+        else:
+            msg_iris.linear.x = target_angles[0]
+        if np.abs(target_angles[1])>1.0:
+            msg_iris.linear.y = 1.0*np.sign(target_angles[1])
+        else:
+            msg_iris.linear.y = target_angles[1]
+        if np.abs(target_angles[2])>1.0:
+            msg_iris.linear.z = 1.0*np.sign(target_angles[2])
+        else:
+            msg_iris.linear.z = target_angles[2]
+        if np.abs(target_angles[3])>1.0:
+            msg_iris.angular.z = 1.0*np.sign(target_angles[3])
+        else:
+            msg_iris.angular.z = target_angles[3]
         self.pub_vel.publish(msg_iris)
-
-        
+       
 def main():
     global ros_node, publisher
     ros_node = rospy.init_node('drone_controller')
