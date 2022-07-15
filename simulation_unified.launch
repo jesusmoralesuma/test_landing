@@ -17,12 +17,10 @@
 
        <node pkg="tf" type="static_transform_publisher" name="marker55_broadcaster" args="-0.06175 0.06175 0 0 0 0 fiducial_55 fiducial_T_55 10"/>
 
-       <node pkg="tf" type="static_transform_publisher" name="cam_broadcaster" args="0 0 0.07 0 0 0 base_link iris_demo::cam_link 10"/>
-       <!-- <node pkg="tf" type="static_transform_publisher" name="cam_broadcaster" args="0 0 0 0 0 0 base_link iris_demo::cam_link 15"/> -->
+       <node pkg="tf" type="static_transform_publisher" name="cam_broadcaster" args="0 0 0 3.1415 3.1415 0 base_link iris_demo::cam_link 10"/>
     </group> 
 
     <include file="$(find hector_imu_attitude_to_tf)/launch/example.launch"> </include>
-    <include file="$(find hexa_teleop)/launch/teleop_hexa.launch"> </include>
-
+    <include file="$(find hexa_teleop)/launch/teleop.launch"> </include>
 
 </launch>

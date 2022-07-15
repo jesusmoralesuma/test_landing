@@ -1,0 +1,59 @@
+T1 Launch simulator and teleoperation node (need PS4, default, or F710 gamepads)
+
+cd ~/durable_simulator/autonomous_landing_drone/Simulation
+roslaunch simulation_unified.launch
+
+Correct UAV pose in Gazebo
+
+T2 Launch arducopter SIL
+
+cd ~/durable_simulator/catkin_ws/src/ardupilot/ArduCopter
+../Tools/autotest/sim_vehicle.py -v ArduCopter -f gazebo-iris  -m --mav10 --console -I0 -L Evora --mavproxy-args="--streamrate=-1"
+
+T3 Publish UAV sensor at 15Hz in mavros topics
+
+rosrun mavros mavsys rate --all 15
+
+T2 GUIDED -> ARM -> TAKEOFF
+
+Wait until message
+FCU: EKF3 IMU1 is using GPS
+Then, in arducopter console type
+
+GUIDED
+arm throttle
+takeoff 3
+
+T4 Record topics
+
+cd ~/durable_simulator/autonomous_landing_drone/Simulation/bags
+rosbag record /tf /tf_static /fiducial_images/compressed /fiducial_transforms /mavros/imu/data /mavros/setpoint_velocity/cmd_vel_unstamped /mavros/state /estimation/xyzy /uav_setpoint
+
+T5 Run UAV controller
+cd ~/durable_simulator/autonomous_landing_drone/Simulation
+python follow_UGV_trajectory_trap_unified.py
+
+Use joystick to change mode of operation (L1 teleoperation mode, R1 autonomous mode)
+
+T6 Publish Jackal cmd_vel
+
+rostopic pub /jackal2/jackal_velocity_controller/cmd_vel geometry_msgs/Twist "linear:
+  x: 0.0
+  y: 0.0
+  z: 0.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.0" -r 15
+
+T6 Publish UAV fiducial setpoint
+
+rostopic pub /uav_setpoint geometry_msgs/Twist "linear: 
+  x: 0.0
+  y: 0.0
+  z: 2.0
+angular:
+  x: 0.0
+  y: 0.0
+  z: 0.0"
+
