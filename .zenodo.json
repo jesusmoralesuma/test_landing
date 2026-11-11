@@ -1,0 +1,47 @@
+{
+  "title": "test_landing: vision-based autonomous following and landing of a UAV on a moving ground platform",
+  "upload_type": "software",
+  "description": "<p>ROS code that lets a multirotor UAV detect, follow and land on a moving unmanned ground vehicle (UGV) using ArUco fiducial markers and a single on-board camera. It accompanies the article: J. Morales, I. Castelo, R. Serra, P. U. Lima and M. Basiri, \"Vision-Based Autonomous Following of a Moving Platform and Landing for an Unmanned Aerial Vehicle\", Sensors, vol. 23, no. 2, 829, 2023, https://doi.org/10.3390/s23020829.</p><p>The code was written in June and July 2022 at the Institute for Systems and Robotics (ISR/LARSyS) of Instituto Superior Técnico, Lisbon, within the EU project DURABLE. It is research code released as is, to document the method and make the experiments reproducible.</p><p>The code is released under the BSD 3-Clause License. The directory models/iris_camera contains a third-party Gazebo model derived from the ArduPilot Gazebo plugin and is redistributed under its original GPL-3.0 licence.</p>",
+  "creators": [
+    {
+      "name": "Morales, Jesús",
+      "affiliation": "Universidad de Málaga",
+      "orcid": "0000-0003-1095-4775"
+    },
+    {
+      "name": "Castelo, Isabel",
+      "affiliation": "Institute for Systems and Robotics, Instituto Superior Técnico, Universidade de Lisboa"
+    },
+    {
+      "name": "Serra, Rodrigo",
+      "affiliation": "Institute for Systems and Robotics, Instituto Superior Técnico, Universidade de Lisboa"
+    },
+    {
+      "name": "Lima, Pedro U.",
+      "affiliation": "Institute for Systems and Robotics, Instituto Superior Técnico, Universidade de Lisboa"
+    },
+    {
+      "name": "Basiri, Meysam",
+      "affiliation": "Institute for Systems and Robotics, Instituto Superior Técnico, Universidade de Lisboa"
+    }
+  ],
+  "license": "bsd-3-clause",
+  "access_right": "open",
+  "language": "eng",
+  "keywords": [
+    "unmanned aerial vehicle",
+    "unmanned ground vehicle",
+    "autonomous landing",
+    "target following",
+    "artificial fiducial markers",
+    "pose estimation",
+    "ROS"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.3390/s23020829",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-article"
+    }
+  ]
+}
