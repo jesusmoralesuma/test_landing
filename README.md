@@ -1,5 +1,7 @@
 # Vision-based autonomous following and landing of a UAV on a moving ground platform
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24139549.svg)](https://doi.org/10.5281/zenodo.24139549)
+
 ROS code that lets a multirotor UAV detect, follow and land on a moving unmanned ground vehicle (UGV) using ArUco fiducial markers and a single on-board camera. It accompanies the article:
 
 > J. Morales, I. Castelo, R. Serra, P. U. Lima and M. Basiri, "Vision-Based Autonomous Following of a Moving Platform and Landing for an Unmanned Aerial Vehicle", *Sensors*, vol. 23, no. 2, 829, 2023. https://doi.org/10.3390/s23020829
@@ -106,6 +108,8 @@ On the ground station, launch the gamepad teleoperation node. A safety pilot mus
 `test_trajectory.py` plots the trapezoidal profiles offline. It imports a helper function from `data_read_unified.py`, which reads the configured rosbag when imported, so a recording must be available to run it.
 
 ## Citation
+
+The code is archived at Zenodo: https://doi.org/10.5281/zenodo.24139549 (this DOI always resolves to the latest version).
 
 If you use this code, please cite the article:
 
